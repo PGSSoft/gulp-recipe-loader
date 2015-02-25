@@ -1,0 +1,178 @@
+'use strict';
+
+var findup = require('findup-sync');
+var loadPlugins = require('gulp-load-plugins');
+var multimatch = require('gulp-load-plugins/node_modules/multimatch');
+var _ = require('lodash');
+var path = require('path');
+var globby = require('globby');
+
+// workaround for linked development modules
+var prequire = require('parent-require');
+var requireFn = function (module) {
+    try {
+        return require(module);
+    }
+    catch(e) {
+        return prequire(module);
+    }
+};
+
+// Necessary to get the current `module.parent` and resolve paths correctly when required from multiple places.
+delete require.cache[__filename];
+var parentDir = path.dirname(module.parent.filename);
+
+function camelize(str) {
+    return str.replace(/-(\w)/g, function(m, p1) {
+        return p1.toUpperCase();
+    });
+}
+
+// require gulp from outside world to prevent multiple instances. This could also be a peer dependency,
+// but it gets tricky with multiple layers of modules
+module.exports = function (gulp, options) {
+    if(!options) {
+        options = {};
+    }
+
+    // set default options
+    options = _.merge({
+        tasks: {},
+        paths: {},
+        sources: {
+            defaultBase: '.'
+        },
+        recipesPattern: 'gulp-recipes/{*/main.js,*.js}',
+        rename: {}
+    }, options);
+
+    // read package.json or get it from options
+    var packageFile = options.package || findup('package.json', {cwd: parentDir});
+    if (typeof packageFile === 'string') {
+        packageFile = require(packageFile);
+    }
+
+    // lazy load all non-recipe plugins from package.json
+    var $ = loadPlugins({
+        pattern: ['*', '!gulp-recipe-*', '!gulp'],
+        scope: ['dependencies', 'devDependencies'],
+        replaceString: 'gulp-',
+        camelize: true,
+        lazy: true,
+        config: packageFile,
+        rename: options.rename,
+        requireFn: requireFn
+    });
+
+    // force single gulp instance
+    Object.defineProperty($, 'gulp', {value: gulp});
+
+    // publish some internal packages to modules, if not published already
+    _.each(['lazypipe', 'event-stream', 'lodash', 'through2'], function (internal) {
+        var camelized = camelize(internal);
+        if(!$.hasOwnProperty(camelized)) {
+            Object.defineProperty($, camelized, {
+                get: function() {
+                    return require(internal);
+                }
+            });
+        }
+    });
+
+    // load utility functions
+    $.utils = require('./utils')($);
+
+    // resolve external recipe directories
+    var externPattern = ['gulp-recipe-*', '!gulp-recipe-loader'];
+    var externScope = ['dependencies', 'devDependencies'];
+    var replaceString = 'gulp-recipe-';
+    var pluginNames = _.reduce(externScope, function(result, prop) {
+        return result.concat(Object.keys(packageFile[prop] || {}));
+    }, []);
+
+    var recipeDirectory = _.transform(multimatch(pluginNames, externPattern), function (obj, name) {
+        var renamed = options.rename[name] || camelize(name.replace(replaceString, ''));
+        obj[renamed] = path.join(parentDir, 'node_modules', name);
+    }, {});
+
+    // lazy load all recipes from package.json
+    var extPluginsConfig = {
+        pattern: externPattern,
+        scope: externScope,
+        replaceString: replaceString,
+        camelize: true,
+        lazy: false,
+        config: packageFile,
+        rename: options.rename,
+        requireFn: requireFn
+    };
+
+    var recipes = loadPlugins(extPluginsConfig);
+
+    // load all recipes from local project directory
+    var localRecipes = _.map(globby.sync(options.recipesPattern), function (module) {
+        return require(module);
+    });
+
+    // create a way to extend lib getter object with modules local libs, prefer local versions
+    var LibsProto = function () {};
+    LibsProto.prototype = $;
+
+    var localLibBuilder = function (recipeName) {
+        var localLibs = new LibsProto();
+        var dir = recipeDirectory[recipeName];
+        if(dir) {
+            // find internal package.json
+            var localPackageFile = require(findup('package.json', {cwd: dir}));
+
+            // load recipe dependencies
+            var localConfig = _.defaults({
+                pattern: '*',
+                replaceString: 'gulp-',
+                config: localPackageFile,
+                lazy: true,
+                requireFn: function (name) {
+                    // resolve inner dependency path
+                    var depPath = path.join(dir, 'node_modules', name);
+                    return requireFn(depPath);
+                }
+            }, extPluginsConfig);
+
+            var localPlugins = loadPlugins(localConfig);
+
+            // pass lazy properties of loaded dependencies into local $ object
+            _.each(Object.getOwnPropertyNames(localPlugins), function (prop) {
+                Object.defineProperty(localLibs, prop, {
+                    get: function () {
+                        return localPlugins[prop];
+                    }
+                })
+            });
+        }
+
+        return localLibs;
+    };
+
+    // prepare lazy initializers for recipes, so it may be cross referenced
+    $.recipes = {};
+    _.each(_.merge(recipes, localRecipes), function (recipeDef, key) {
+        Object.defineProperty($.recipes, key, {
+            get: _.once(function () {
+                // load module's local dependencies
+                var localLibs = localLibBuilder(key);
+                // run config reader on given config
+                var localConfig = recipeDef.configReader ? recipeDef.configReader(localLibs, _.clone(options)) : _.clone(options);
+                // prepare source pipes
+                var sources = $.utils.makeSources(localConfig.sources);
+                return recipeDef.recipe(localLibs, localConfig, sources);
+            })
+        });
+    });
+
+    // force load all recipes
+    _.each(Object.getOwnPropertyNames($.recipes), function (key) {
+        return $.recipes[key];
+    });
+
+    return $;
+};
