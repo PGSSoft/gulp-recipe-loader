@@ -39,6 +39,7 @@ module.exports = function (gulp, options) {
     options = _.merge({
         tasks: {},
         paths: {},
+        order: {},
         sources: {
             defaultBase: '.'
         },
@@ -111,7 +112,7 @@ module.exports = function (gulp, options) {
 
     // load all recipes from local project directory
     var localRecipes = _.map(globby.sync(options.recipesPattern), function (module) {
-        return require(module);
+        return require(path.join(parentDir, module));
     });
 
     // create a way to extend lib getter object with modules local libs, prefer local versions
@@ -158,6 +159,10 @@ module.exports = function (gulp, options) {
     _.each(_.merge(recipes, localRecipes), function (recipeDef, key) {
         Object.defineProperty($.recipes, key, {
             get: _.once(function () {
+                if(_.isFunction(recipeDef)) {
+                    recipeDef = { recipe: recipeDef };
+                }
+
                 // load module's local dependencies
                 var localLibs = localLibBuilder(key);
                 // run config reader on given config
