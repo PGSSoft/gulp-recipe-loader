@@ -45,6 +45,10 @@ module.exports = function ($) {
     // prepare lazypipes with source files, as defined in "sources" configuration
     function makeSources(sources) {
         return _.reduce(sources, function (obj, source, key) {
+            if(key === 'defaultBase') {
+                return obj;
+            }
+
             var direct = _.isArray(source) || _.isString(source);
 
             var base = (!direct && source.base) || sources.defaultBase;
