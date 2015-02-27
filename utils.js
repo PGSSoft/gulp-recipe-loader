@@ -125,10 +125,15 @@ module.exports = function ($) {
         });
     }
 
-    function watchSource(source, callback) {
+    function watchSource(sources, callback) {
+        if(!_.isArray(sources)) {
+            sources = [sources];
+        }
+
         // load watch as external dep
+        var distincts = _.flatten(_.pluck(sources, 'distinct'));
         if($.hasOwnProperty('watch')) {
-            return $.utils.mergedLazypipe(_.map(source.distinct, function (opts) {
+            return $.utils.mergedLazypipe(_.map(distincts, function (opts) {
                 return $.lazypipe()
                     .pipe($.watch, opts.globs, {base: opts.base}, callback);
             }));
