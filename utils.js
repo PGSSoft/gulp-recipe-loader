@@ -125,21 +125,28 @@ module.exports = function ($) {
         });
     }
 
+    /**
+     * Watch source files and do action when any file is added, modified, renamed or deleted
+     * Note: needs gulp-watch installed as main project dependency
+     * @param sources Source or array of sources to watch
+     * @param callback Callback to gulp-sass, called when fs event occurs
+     * @returns {*} Endless pipe emitting changed files
+     */
     function watchSource(sources, callback) {
-        if(!_.isArray(sources)) {
-            sources = [sources];
-        }
-
-        // load watch as external dep
-        var distincts = _.flatten(_.pluck(sources, 'distinct'));
         if($.hasOwnProperty('watch')) {
+            if(!_.isArray(sources)) {
+                sources = [sources];
+            }
+
+            // load watch as external dep
+            var distincts = _.flatten(_.pluck(sources, 'distinct'));
             return $.utils.mergedLazypipe(_.map(distincts, function (opts) {
                 return $.lazypipe()
                     .pipe($.watch, opts.globs, {base: opts.base}, callback);
             }));
         }
         else {
-            $.gulp.error('Optional dependency missing: gulp-watch');
+            throw 'Optional dependency missing: gulp-watch';
         }
     }
 
