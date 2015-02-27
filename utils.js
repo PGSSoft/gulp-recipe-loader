@@ -214,6 +214,14 @@ module.exports = function ($) {
             tasks = [tasks];
         }
 
+        // exit when no tasks to execute
+        if(tasks.length === 0) {
+            if(_.isFunction(cb)) {
+                cb();
+            }
+            return;
+        }
+
         var running = tasks.length;
         var off = on('task_stop', function (e) {
             if(tasks.indexOf(e.task) >= 0 && --running === 0) {
