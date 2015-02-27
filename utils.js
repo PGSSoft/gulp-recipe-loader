@@ -2,22 +2,31 @@ module.exports = function ($) {
     var _ = $.lodash;
 
     // get pipes with given prefix from specific list
-    function getPipesFrom(pipes, prefix) {
+    function _getPipesFrom(pipes, prefix) {
         return pipes ? _.reject(pipes, function (val, key) {
             return prefix ? key.indexOf(prefix) : true; // no prefix means no filtering
         }) : [];
     }
 
-    // get pipes with given prefix from all recipes
+    /**
+     * Retrive a list of published pipes with specified prefix from all loaded recipes
+     * Note: Suitable for both sequential definitions and plain lazypipes, but type is not checked!
+     * @param prefix pipe prefix
+     * @returns {*} array of pipe definitions
+     */
     function getPipes(prefix) {
         return _.reduce(Object.getOwnPropertyNames($.recipes), function (mem, moduleName) {
             var m = $.recipes[moduleName];
-            var pipes = getPipesFrom(m.pipes, prefix);
+            var pipes = _getPipesFrom(m.pipes, prefix);
             return pipes ? mem.concat(pipes) : mem;
         }, []);
     }
 
-    // merge multiple lazypipes into one
+    /**
+     * Merge multiple lazypipes into one
+     * @param lazypipes array of plain lazypipes
+     * @returns {lazypipe} merged lazypipe
+     */
     function mergedLazypipe(lazypipes) {
         if (lazypipes && lazypipes.length > 0) {
             return $.lazypipe()
@@ -31,7 +40,11 @@ module.exports = function ($) {
         return $.through2.obj;
     }
 
-    // merge multiple lazypipes one after another
+    /**
+     * Merge multiple lazypipes one after another
+     * @param lazypipeDefs array of lazypipe definitions with specified order [[order, lazypipe], ...]
+     * @returns {lazypipe} lazypipe representing a sequence of tasks
+     */
     function sequentialLazypipe(lazypipeDefs) {
         return _.chain(lazypipeDefs)
             .sortBy(0)
@@ -42,13 +55,13 @@ module.exports = function ($) {
             .value();
     }
 
-    function parseSource(source) {
+    function _parseSource(source) {
         if(_.isString(source)) {
             return [{files: source, read: true}];
         }
 
         if(_.isArray(source)) {
-            return _.flatten(_.map(_.filter(_.flatten(source)), parseSource));
+            return _.flatten(_.map(_.filter(_.flatten(source)), _parseSource));
         }
 
         if(_.isObject(source)) {
@@ -56,7 +69,7 @@ module.exports = function ($) {
                 return [source];
             }
 
-            var files = parseSource(source.files);
+            var files = _parseSource(source.files);
             if(!_.isUndefined(source.read)) {
                 _.each(files, function (file) { file.read = source.read; })
             }
@@ -71,11 +84,16 @@ module.exports = function ($) {
     }
 
     // prepare lazypipes with source files, as defined in "sources" configuration
-    function makeSources(sources) {
-        return _.transform(sources, function (obj, source, key) {
-            obj[key] = _.chain(parseSource(source))
+    /**
+     * Transform source config into actual source pipes
+     * @param sourceDefs sources configuration
+     * @returns {*} hash of source pipes
+     */
+    function makeSources(sourceDefs) {
+        return _.transform(sourceDefs, function (obj, source, key) {
+            obj[key] = _.chain(_parseSource(source))
                 .map(function (obj) {
-                    return _.defaults(obj, {read: true, base: sources.defaultBase});
+                    return _.defaults(obj, {read: true, base: sourceDefs.defaultBase});
                 })
                 .groupBy(function (obj) {
                     return '' + obj.read + '' + obj.base;
@@ -93,7 +111,7 @@ module.exports = function ($) {
                 })
                 .thru(function (pipes) {
                     if(pipes.length > 1) {
-                        var singlePipe = $.utils.mergedLazypipe(pipes);
+                        var singlePipe = mergedLazypipe(pipes);
                         singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
                         singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
                         singlePipe.distinct = _.map(pipes, function (pipe) {
@@ -140,7 +158,7 @@ module.exports = function ($) {
 
             // load watch as external dep
             var distincts = _.flatten(_.pluck(sources, 'distinct'));
-            return $.utils.mergedLazypipe(_.map(distincts, function (opts) {
+            return mergedLazypipe(_.map(distincts, function (opts) {
                 return $.lazypipe()
                     .pipe($.watch, opts.globs, {base: opts.base}, callback);
             }));
@@ -154,7 +172,7 @@ module.exports = function ($) {
     // so bind it only once and resolve handlers in loop
 
     // register event only once
-    var getEventProcessor = _.memoize(function (event) {
+    var _getEventProcessor = _.memoize(function (event) {
         var handlers = [];
         $.gulp.on(event, function () {
             var self = this;
@@ -179,13 +197,18 @@ module.exports = function ($) {
 
     function on(event, cb) {
         // initialize and get event processor
-        var handlers = getEventProcessor(event);
+        var handlers = _getEventProcessor(event);
         // add handler
         handlers.add(cb);
         // return function to unbind event
         return handlers.remove.bind(handlers, cb);
     }
 
+    /**
+     * Run gulp tasks and provide end callback
+     * @param tasks Array of single task name to be started
+     * @param cb Function to be called when tasks end
+     */
     function runSubtasks(tasks, cb) {
         if(!_.isArray(tasks)) {
             tasks = [tasks];
