@@ -158,6 +158,7 @@ module.exports = function (gulp, options) {
     $.recipes = {};
     _.each(_.merge(recipes, localRecipes), function (recipeDef, key) {
         Object.defineProperty($.recipes, key, {
+            enumerable: true,
             get: _.once(function () {
                 if(_.isFunction(recipeDef)) {
                     recipeDef = { recipe: recipeDef };
