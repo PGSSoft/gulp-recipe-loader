@@ -42,22 +42,73 @@ module.exports = function ($) {
             .value();
     }
 
-    // prepare lazypipes with source files, as defined in "sources" configuration
-    function makeSources(sources) {
-        return _.reduce(sources, function (obj, source, key) {
-            if(key === 'defaultBase') {
-                return obj;
+    function parseSource(source) {
+        if(_.isString(source)) {
+            return [{files: source, read: true}];
+        }
+
+        if(_.isArray(source)) {
+            return _.flatten(_.map(_.filter(_.flatten(source)), parseSource));
+        }
+
+        if(_.isObject(source)) {
+            if(_.isString(source.files)) {
+                return [source];
             }
 
-            var direct = _.isArray(source) || _.isString(source);
+            var files = parseSource(source.files);
+            if(!_.isUndefined(source.read)) {
+                _.each(files, function (file) { file.read = source.read; })
+            }
 
-            var base = (!direct && source.base) || sources.defaultBase;
-            var sourceStrs = direct ? source : source.files;
-            var read = (direct || _.isUndefined(source.read)) ? true : source.read;
+            if(!_.isUndefined(source.base)) {
+                _.each(files, function (file) { file.base = source.base; })
+            }
 
-            obj[key] = $.lazypipe()
-                .pipe($.gulp.src, sourceStrs, {base: base, read: read});
-            return obj;
+            return files;
+        }
+        return [];
+    }
+
+    // prepare lazypipes with source files, as defined in "sources" configuration
+    function makeSources(sources) {
+        return _.transform(sources, function (obj, source, key) {
+            obj[key] = _.chain(parseSource(source))
+                .map(function (obj) {
+                    return _.defaults(obj, {read: true, base: sources.defaultBase});
+                })
+                .groupBy(function (obj) {
+                    return '' + obj.read + '' + obj.base;
+                })
+                .values()
+                .map(function (defs) {
+                    var files = _.pluck(defs, 'files'),
+                        read = defs[0].read,
+                        base = defs[0].base,
+                        pipe = $.lazypipe().pipe($.gulp.src, files, {base: base, read: read});
+
+                    pipe.globs = files;
+                    pipe.bases = [base];
+                    return pipe;
+                })
+                .thru(function (pipes) {
+                    if(pipes.length > 1) {
+                        var singlePipe = $.utils.mergedLazypipe(pipes);
+                        singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
+                        singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
+                        singlePipe.distinct = _.map(pipes, function (pipe) {
+                            return {globs: pipe.globs, base: pipe.bases[0]};
+                        });
+                        Object.freeze(singlePipe);
+                        return singlePipe;
+                    }
+
+                    var pipe = pipes[0];
+                    pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
+                    Object.freeze(pipe);
+                    return pipe;
+                })
+                .value();
         }, {});
     }
 
@@ -74,11 +125,80 @@ module.exports = function ($) {
         });
     }
 
+    function watchSource(source, callback) {
+        // load watch as external dep
+        if($.hasOwnProperty('watch')) {
+            return $.utils.mergedLazypipe(_.map(source.distinct, function (opts) {
+                return $.lazypipe()
+                    .pipe($.watch, opts.globs, {base: opts.base}, callback);
+            }));
+        }
+        else {
+            $.gulp.error('Optional dependency missing: gulp-watch');
+        }
+    }
+
+    // orchestrator events cannot be unbound,
+    // so bind it only once and resolve handlers in loop
+
+    // register event only once
+    var getEventProcessor = _.memoize(function (event) {
+        var handlers = [];
+        $.gulp.on(event, function () {
+            var self = this;
+            var args = arguments;
+
+            _.each(handlers, function (handler) {
+                handler.apply(self, args);
+            });
+        });
+        return {
+            add: function (cb) {
+                handlers.push(cb);
+            },
+            remove: function (cb) {
+                var index = handlers.indexOf(cb);
+                if(index >= 0) {
+                    handlers.splice(index, 1);
+                }
+            }
+        };
+    });
+
+    function on(event, cb) {
+        // initialize and get event processor
+        var handlers = getEventProcessor(event);
+        // add handler
+        handlers.add(cb);
+        // return function to unbind event
+        return handlers.remove.bind(handlers, cb);
+    }
+
+    function runSubtasks(tasks, cb) {
+        if(!_.isArray(tasks)) {
+            tasks = [tasks];
+        }
+
+        var running = tasks.length;
+        var off = on('task_stop', function (e) {
+            if(tasks.indexOf(e.task) >= 0 && --running === 0) {
+                off();
+                if(_.isFunction(cb)) {
+                    cb();
+                }
+            }
+        });
+
+        $.gulp.start(tasks);
+    }
+
     return {
         getPipes: getPipes,
         mergedLazypipe: mergedLazypipe,
         sequentialLazypipe: sequentialLazypipe,
-        makeSources: makeSources,
+        makeSources: _.memoize(makeSources),
+        watchSource: watchSource,
+        runSubtasks: runSubtasks,
         sortFiles: $.lazypipe()
             .pipe(sort, function (a, b) { return b.path ===  a.path ? 0 : b.path > a.path ? 1 : -1; })
     }
