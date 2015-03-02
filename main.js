@@ -111,9 +111,9 @@ module.exports = function (gulp, options) {
     var recipes = loadPlugins(extPluginsConfig);
 
     // load all recipes from local project directory
-    var localRecipes = _.map(globby.sync(options.recipesPattern), function (module) {
-        return require(path.join(parentDir, module));
-    });
+    var localRecipes = _.object(_.map(globby.sync(options.recipesPattern), function (module) {
+        return [path.basename(module, '.js'), require(path.join(parentDir, module))];
+    }));
 
     // create a way to extend lib getter object with modules local libs, prefer local versions
     var LibsProto = function () {};
