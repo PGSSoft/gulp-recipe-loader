@@ -69,8 +69,8 @@ module.exports = function (gulp, options) {
     Object.defineProperty($, 'gulp', {value: gulp});
 
     // publish some internal packages to modules, if not published already
-    _.each(['lazypipe', 'event-stream', 'lodash', 'through2'], function (internal) {
-        var camelized = camelize(internal);
+    _.each(['lazypipe', 'event-stream', 'lodash', 'through2', 'gulp-watch'], function (internal) {
+        var camelized = camelize(internal.replace('gulp-',''));
         if(!$.hasOwnProperty(camelized)) {
             Object.defineProperty($, camelized, {
                 get: function() {
