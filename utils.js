@@ -151,21 +151,16 @@ module.exports = function ($) {
      * @returns {*} Endless pipe emitting changed files
      */
     function watchSource(sources, callback) {
-        if($.hasOwnProperty('watch')) {
-            if(!_.isArray(sources)) {
-                sources = [sources];
-            }
+        if(!_.isArray(sources)) {
+            sources = [sources];
+        }
 
-            // load watch as external dep
-            var distincts = _.flatten(_.pluck(sources, 'distinct'));
-            return mergedLazypipe(_.map(distincts, function (opts) {
-                return $.lazypipe()
-                    .pipe($.watch, opts.globs, {base: opts.base}, callback);
-            }));
-        }
-        else {
-            throw 'Optional dependency missing: gulp-watch';
-        }
+        // load watch as external dep
+        var distincts = _.flatten(_.pluck(sources, 'distinct'));
+        return mergedLazypipe(_.map(distincts, function (opts) {
+            return $.lazypipe()
+                .pipe($.watch, opts.globs, {base: opts.base}, callback);
+        }));
     }
 
     // orchestrator events cannot be unbound,
@@ -214,7 +209,7 @@ module.exports = function ($) {
             tasks = [tasks];
         }
 
-        // exit when no tasks to execute
+        // exit when
         if(tasks.length === 0) {
             if(_.isFunction(cb)) {
                 cb();
