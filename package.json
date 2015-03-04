@@ -23,6 +23,7 @@
     "globby": "^1.2.0",
     "gulp": "^3.8.11",
     "gulp-load-plugins": "^0.8.0",
+    "gulp-util": "^3.0.4",
     "gulp-watch": "^4.1.1",
     "lazypipe": "^0.2.2",
     "lodash": "^3.3.0",

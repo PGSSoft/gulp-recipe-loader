@@ -6,6 +6,7 @@ var multimatch = require('gulp-load-plugins/node_modules/multimatch');
 var _ = require('lodash');
 var path = require('path');
 var globby = require('globby');
+var gutil = require('gulp-util');
 
 // workaround for linked development modules
 var prequire = require('parent-require');
@@ -17,6 +18,26 @@ var requireFn = function (module) {
         return prequire(module);
     }
 };
+
+// error handling
+function formatError(e) {
+    if (!e.err) {
+        return e.message;
+    }
+
+    // PluginError
+    if (typeof e.err.showStack === 'boolean') {
+        return e.err.toString();
+    }
+
+    // normal error
+    if (e.err.stack) {
+        return e.err.stack;
+    }
+
+    // unknown (string, number, etc.)
+    return new Error(String(e.err)).stack;
+}
 
 // Necessary to get the current `module.parent` and resolve paths correctly when required from multiple places.
 delete require.cache[__filename];
@@ -80,7 +101,9 @@ module.exports = function (gulp, options) {
         }
     });
 
+
     // load utility functions
+    $.gutil = gutil;
     $.utils = require('./utils')($);
 
     // resolve external recipe directories
@@ -164,20 +187,39 @@ module.exports = function (gulp, options) {
                     recipeDef = { recipe: recipeDef };
                 }
 
-                // load module's local dependencies
-                var localLibs = localLibBuilder(key);
-                // run config reader on given config
-                var localConfig = recipeDef.configReader ? recipeDef.configReader(localLibs, _.clone(options)) : _.clone(options);
-                // prepare source pipes
-                var sources = $.utils.makeSources(localConfig.sources);
-                return recipeDef.recipe(localLibs, localConfig, sources);
+                var localLibs, localConfig, sources;
+                try {
+                    // load module's local dependencies
+                    localLibs = localLibBuilder(key);
+                    // run config reader on given config
+                    localConfig = recipeDef.configReader ? recipeDef.configReader(localLibs, _.clone(options)) : _.clone(options);
+                    // prepare source pipes
+                    sources = localLibs.utils.makeSources(localConfig.sources);
+                    return recipeDef.recipe(localLibs, localConfig, sources);
+                }
+                catch(e) {
+                    // catch recipe errors
+                    if(e instanceof $.utils.RecipeError) {
+                        throw new $.utils.NamedRecipeError(key, e.message, e.options);
+                    }
+                    else {
+                        throw e;
+                    }
+                }
             })
         });
     });
 
     // force load all recipes
     _.each(Object.getOwnPropertyNames($.recipes), function (key) {
-        return $.recipes[key];
+        try {
+            return $.recipes[key];
+        }
+        catch(e) {
+            var msg = formatError({err: e});
+            $.gutil.log(msg);
+            process.exit(1);
+        }
     });
 
     return $;

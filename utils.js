@@ -1,3 +1,5 @@
+'use strict';
+
 module.exports = function ($) {
     var _ = $.lodash;
 
@@ -37,7 +39,7 @@ module.exports = function ($) {
                 });
         }
 
-        return $.through2.obj;
+        return $.lazypipe().pipe($.through2.obj);
     }
 
     /**
@@ -121,10 +123,25 @@ module.exports = function ($) {
                         return singlePipe;
                     }
 
-                    var pipe = pipes[0];
-                    pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
-                    Object.freeze(pipe);
-                    return pipe;
+                    if(pipes.length === 1) {
+                        var pipe = pipes[0];
+                        pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
+                        Object.freeze(pipe);
+                        return pipe;
+                    }
+                    else {
+                        var empty = $.lazypipe().pipe(function () {
+                            // instant end
+                            var stream = $.through2.obj();
+                            stream.push(null);
+                            return stream;
+                        });
+
+                        empty.distinct = [{globs: [], base: '.'}];
+                        empty.globs = [];
+                        Object.freeze(empty);
+                        return empty;
+                    }
                 })
                 .value();
         }, {});
@@ -251,6 +268,48 @@ module.exports = function ($) {
         }
     }
 
+    /**
+     * Base error class factory to throw from within recipe.
+     */
+    function RecipeError(message, options) {
+        this.message = message;
+        this.options = options;
+    }
+
+    /**
+     *
+     * @param name recipe name
+     * @param message
+     * @param options
+     * @constructor
+     */
+    function NamedRecipeError(name, message, options) {
+        return $.gutil.PluginError.call(this, name, message, options);
+    }
+
+    NamedRecipeError.prototype = Object.create($.gutil.PluginError.prototype);
+    NamedRecipeError.prototype.toString = function () {
+        var sig = $.gutil.colors.red(this.name) + ' in recipe \'' + $.gutil.colors.cyan(this.plugin) + '\'';
+        var detailsWithStack = function (stack) {
+            return this._messageWithDetails() + '\nStack:\n' + stack;
+        }.bind(this);
+
+        var msg;
+        if (this.showStack) {
+            if (this.__safety) { // There is no wrapped error, use the stack captured in the PluginError ctor
+                msg = this.__safety.stack;
+            } else if (this._stack) {
+                msg = detailsWithStack(this._stack);
+            } else { // Stack from wrapped error
+                msg = detailsWithStack(this.stack);
+            }
+        } else {
+            msg = this._messageWithDetails();
+        }
+
+        return sig + '\n' + msg;
+    };
+
     return {
         getPipes: getPipes,
         mergedLazypipe: mergedLazypipe,
@@ -259,6 +318,8 @@ module.exports = function ($) {
         watchSource: watchSource,
         runSubtasks: runSubtasks,
         maybeTask: maybeTask,
+        RecipeError: RecipeError,
+        NamedRecipeError: NamedRecipeError,
         sortFiles: $.lazypipe()
             .pipe(sort, function (a, b) { return b.path ===  a.path ? 0 : b.path > a.path ? 1 : -1; })
     }
