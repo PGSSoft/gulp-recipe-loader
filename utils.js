@@ -240,6 +240,17 @@ module.exports = function ($) {
         $.gulp.start(tasks);
     }
 
+    /**
+     * Conditionaly register gulp task only when name is present
+     * @param name
+     * @returns {*}
+     */
+    function maybeTask(name) {
+        if(name) {
+            return $.gulp.task.apply($.gulp, arguments);
+        }
+    }
+
     return {
         getPipes: getPipes,
         mergedLazypipe: mergedLazypipe,
@@ -247,6 +258,7 @@ module.exports = function ($) {
         makeSources: _.memoize(makeSources),
         watchSource: watchSource,
         runSubtasks: runSubtasks,
+        maybeTask: maybeTask,
         sortFiles: $.lazypipe()
             .pipe(sort, function (a, b) { return b.path ===  a.path ? 0 : b.path > a.path ? 1 : -1; })
     }
