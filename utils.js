@@ -57,93 +57,108 @@ module.exports = function ($) {
             .value();
     }
 
-    function _parseSource(source) {
-        if(_.isString(source)) {
+    var _parseSource = _.memoize(function (source) {
+        if (_.isString(source)) {
             return [{files: source, read: true}];
         }
 
-        if(_.isArray(source)) {
+        if (_.isArray(source)) {
             return _.flatten(_.map(_.filter(_.flatten(source)), _parseSource));
         }
 
-        if(_.isObject(source)) {
-            if(_.isString(source.files)) {
+        if (_.isObject(source)) {
+            if (_.isString(source.files)) {
                 return [source];
             }
 
             var files = _parseSource(source.files);
-            if(!_.isUndefined(source.read)) {
-                _.each(files, function (file) { file.read = source.read; })
+            if (!_.isUndefined(source.read)) {
+                _.each(files, function (file) {
+                    file.read = source.read;
+                })
             }
 
-            if(!_.isUndefined(source.base)) {
-                _.each(files, function (file) { file.base = source.base; })
+            if (!_.isUndefined(source.base)) {
+                _.each(files, function (file) {
+                    file.base = source.base;
+                })
             }
 
             return files;
         }
-        return [];
-    }
+
+        return null;
+    });
 
     // prepare lazypipes with source files, as defined in "sources" configuration
     /**
      * Transform source config into actual source pipes
      * @param sourceDefs sources configuration
-     * @returns {*} hash of source pipes
+     * @returns {*} hash of source pipes (lazy loaded)
      */
     function makeSources(sourceDefs) {
         return _.transform(sourceDefs, function (obj, source, key) {
-            obj[key] = _.chain(_parseSource(source))
-                .map(function (obj) {
-                    return _.defaults(obj, {read: true, base: sourceDefs.defaultBase});
-                })
-                .groupBy(function (obj) {
-                    return '' + obj.read + '' + obj.base;
-                })
-                .values()
-                .map(function (defs) {
-                    var files = _.pluck(defs, 'files'),
-                        read = defs[0].read,
-                        base = defs[0].base,
-                        pipe = $.lazypipe().pipe($.gulp.src, files, {base: base, read: read});
-
-                    pipe.globs = files;
-                    pipe.bases = [base];
-                    return pipe;
-                })
-                .thru(function (pipes) {
-                    if(pipes.length > 1) {
-                        var singlePipe = mergedLazypipe(pipes);
-                        singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
-                        singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
-                        singlePipe.distinct = _.map(pipes, function (pipe) {
-                            return {globs: pipe.globs, base: pipe.bases[0]};
-                        });
-                        Object.freeze(singlePipe);
-                        return singlePipe;
+            Object.defineProperty(obj, key, {
+                enumerable: true,
+                get: _.once(function () {
+                    var parsed = _parseSource(source);
+                    if(_.isNull(parsed)) {
+                        throw new RecipeError('Configured source `' + $.gutil.colors.cyan(key) + '` is invalid.');
                     }
 
-                    if(pipes.length === 1) {
-                        var pipe = pipes[0];
-                        pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
-                        Object.freeze(pipe);
-                        return pipe;
-                    }
-                    else {
-                        var empty = $.lazypipe().pipe(function () {
-                            // instant end
-                            var stream = $.through2.obj();
-                            stream.push(null);
-                            return stream;
-                        });
+                    return _.chain(parsed)
+                        .map(function (obj) {
+                            return _.defaults(obj, {read: true, base: sourceDefs.defaultBase});
+                        })
+                        .groupBy(function (obj) {
+                            return '' + obj.read + '' + obj.base;
+                        })
+                        .values()
+                        .map(function (defs) {
+                            var files = _.pluck(defs, 'files'),
+                                read = defs[0].read,
+                                base = defs[0].base,
+                                pipe = $.lazypipe().pipe($.gulp.src, files, {base: base, read: read});
 
-                        empty.distinct = [{globs: [], base: '.'}];
-                        empty.globs = [];
-                        Object.freeze(empty);
-                        return empty;
-                    }
+                            pipe.globs = files;
+                            pipe.bases = [base];
+                            return pipe;
+                        })
+                        .thru(function (pipes) {
+                            if (pipes.length > 1) {
+                                var singlePipe = mergedLazypipe(pipes);
+                                singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
+                                singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
+                                singlePipe.distinct = _.map(pipes, function (pipe) {
+                                    return {globs: pipe.globs, base: pipe.bases[0]};
+                                });
+                                Object.freeze(singlePipe);
+                                return singlePipe;
+                            }
+
+                            if (pipes.length === 1) {
+                                var pipe = pipes[0];
+                                pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
+                                Object.freeze(pipe);
+                                return pipe;
+                            }
+                            else {
+                                var empty = $.lazypipe().pipe(function () {
+                                    // instant end
+                                    var stream = $.through2.obj();
+                                    stream.push(null);
+                                    return stream;
+                                });
+
+                                empty.distinct = [{globs: [], base: '.'}];
+                                empty.globs = [];
+                                Object.freeze(empty);
+                                return empty;
+                            }
+                        })
+                        .value();
                 })
-                .value();
+            })
         }, {});
     }
 
@@ -169,16 +184,16 @@ module.exports = function ($) {
      * @returns {*} Endless pipe emitting changed files
      */
     function watchSource(sources, options, callback) {
-        if(_.isFunction(options) || _.isArray(options) && !callback) {
+        if (_.isFunction(options) || _.isArray(options) && !callback) {
             callback = options;
             options = {};
         }
 
-        if(!_.isObject(options)) {
+        if (!_.isObject(options)) {
             options = {};
         }
 
-        if(!_.isArray(sources)) {
+        if (!_.isArray(sources)) {
             sources = [sources];
         }
 
@@ -210,7 +225,7 @@ module.exports = function ($) {
             },
             remove: function (cb) {
                 var index = handlers.indexOf(cb);
-                if(index >= 0) {
+                if (index >= 0) {
                     handlers.splice(index, 1);
                 }
             }
@@ -232,13 +247,13 @@ module.exports = function ($) {
      * @param cb Function to be called when tasks end
      */
     function runSubtasks(tasks, cb) {
-        if(!_.isArray(tasks)) {
+        if (!_.isArray(tasks)) {
             tasks = [tasks];
         }
 
         // exit when
-        if(tasks.length === 0) {
-            if(_.isFunction(cb)) {
+        if (tasks.length === 0) {
+            if (_.isFunction(cb)) {
                 cb();
             }
             return;
@@ -246,9 +261,9 @@ module.exports = function ($) {
 
         var running = tasks.length;
         var off = on('task_stop', function (e) {
-            if(tasks.indexOf(e.task) >= 0 && --running === 0) {
+            if (tasks.indexOf(e.task) >= 0 && --running === 0) {
                 off();
-                if(_.isFunction(cb)) {
+                if (_.isFunction(cb)) {
                     cb();
                 }
             }
@@ -263,20 +278,55 @@ module.exports = function ($) {
      * @returns {*}
      */
     function maybeTask(name) {
-        if(name) {
+        if (name) {
             return $.gulp.task.apply($.gulp, arguments);
         }
     }
 
+
     /**
-     * Base error class factory to throw from within recipe.
+     * format error message
+     * @param e
+     * @param sig
+     * @returns {string}
+     * @private
      */
-    function RecipeError(message, options) {
-        this.message = message;
-        this.options = options;
+    function _formatError(e, sig) {
+        var detailsWithStack = function (stack) {
+            return e._messageWithDetails() + '\nStack:\n' + stack;
+        };
+
+        var msg;
+        if (e.showStack) {
+            if (e.__safety) { // There is no wrapped error, use the stack captured in the PluginError ctor
+                msg = e.__safety.stack;
+            } else if (this._stack) {
+                msg = detailsWithStack(e._stack);
+            } else { // Stack from wrapped error
+                msg = detailsWithStack(e.stack);
+            }
+        } else {
+            msg = e._messageWithDetails();
+        }
+
+        return sig + '\n' + msg;
     }
 
     /**
+     * Basic error class factory to throw from within recipe.
+     */
+    function RecipeError(message, options) {
+        return $.gutil.PluginError.call(this, '_', $.gutil.colors.red(message), options);
+    }
+    RecipeError.prototype = Object.create($.gutil.PluginError.prototype);
+
+    RecipeError.prototype.toString = function () {
+        var sig = $.gutil.colors.red(this.name) + ' in ' + $.gutil.colors.yellow('recipe loader');
+        return _formatError(this, sig);
+    };
+
+    /**
+     * Recipe error with known name
      *
      * @param name recipe name
      * @param message
@@ -284,31 +334,48 @@ module.exports = function ($) {
      * @constructor
      */
     function NamedRecipeError(name, message, options) {
-        return $.gutil.PluginError.call(this, name, message, options);
+        return $.gutil.PluginError.call(this, name, $.gutil.colors.red(message), options);
     }
 
     NamedRecipeError.prototype = Object.create($.gutil.PluginError.prototype);
     NamedRecipeError.prototype.toString = function () {
         var sig = $.gutil.colors.red(this.name) + ' in recipe \'' + $.gutil.colors.cyan(this.plugin) + '\'';
-        var detailsWithStack = function (stack) {
-            return this._messageWithDetails() + '\nStack:\n' + stack;
-        }.bind(this);
+        return _formatError(this, sig);
+    };
 
-        var msg;
-        if (this.showStack) {
-            if (this.__safety) { // There is no wrapped error, use the stack captured in the PluginError ctor
-                msg = this.__safety.stack;
-            } else if (this._stack) {
-                msg = detailsWithStack(this._stack);
-            } else { // Stack from wrapped error
-                msg = detailsWithStack(this.stack);
+    /**
+     *
+     * @param config config object
+     * @param proplist list of properties to check
+     */
+    function checkMandatory(config, proplist) {
+        function byString(obj, prop) {
+            var chain = prop
+                .replace(/\[(\w+)\]/g, '.$1') // convert indexes to properties
+                .replace(/^\./, '')          // strip a leading dot
+                .split('.');
+
+            for (var i = 0, n = chain.length; i < n; ++i) {
+                var chainPart = chain[i];
+                if (_.isObject(obj)) {
+                    obj = obj[chainPart];
+                } else {
+                    return;
+                }
             }
-        } else {
-            msg = this._messageWithDetails();
+            return obj;
         }
 
-        return sig + '\n' + msg;
-    };
+        if (!_.isArray(proplist)) {
+            proplist = [proplist];
+        }
+
+        _.each(proplist, function (prop) {
+            if (_.isUndefined(byString(config, prop))) {
+                throw new RecipeError('Mandatory config field `' + prop + '` is missing.');
+            }
+        })
+    }
 
     return {
         getPipes: getPipes,
@@ -320,7 +387,10 @@ module.exports = function ($) {
         maybeTask: maybeTask,
         RecipeError: RecipeError,
         NamedRecipeError: NamedRecipeError,
+        checkMandatory: checkMandatory,
         sortFiles: $.lazypipe()
-            .pipe(sort, function (a, b) { return b.path ===  a.path ? 0 : b.path > a.path ? 1 : -1; })
+            .pipe(sort, function (a, b) {
+                return b.path === a.path ? 0 : b.path > a.path ? 1 : -1;
+            })
     }
 };
