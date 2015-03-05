@@ -203,10 +203,10 @@ module.exports = function (gulp, options) {
                 catch(e) {
                     // catch recipe errors
                     if(e instanceof $.utils.RecipeError) {
-                        throw new $.utils.NamedRecipeError(key, e.message, e.options);
+                        throw new $.utils.NamedRecipeError(key, e);
                     }
                     else {
-                        throw e;
+                        throw new $.utils.NamedRecipeError(key, e, {showStack: true});
                     }
                 }
             })

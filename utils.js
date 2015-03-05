@@ -305,20 +305,27 @@ module.exports = function ($) {
      */
     function _formatError(e, sig) {
         var detailsWithStack = function (stack) {
-            return e._messageWithDetails() + '\nStack:\n' + stack;
+            var _message = e.message;
+            e.message = $.gutil.colors.yellow(e.message);
+            var details = e._messageWithDetails();
+            e.message = _message;
+            return details + '\nStack:\n' + stack;
         };
 
         var msg;
         if (e.showStack) {
             if (e.__safety) { // There is no wrapped error, use the stack captured in the PluginError ctor
                 msg = e.__safety.stack;
-            } else if (this._stack) {
+            } else if (e._stack) {
                 msg = detailsWithStack(e._stack);
             } else { // Stack from wrapped error
-                msg = detailsWithStack(e.stack);
+                msg = detailsWithStack(e.stack.replace(e.name + ': ' + e.message + '\n', ''));
             }
         } else {
+            var _message = e.message;
+            e.message = $.gutil.colors.yellow(e.message);
             msg = e._messageWithDetails();
+            e.message = _message;
         }
 
         return sig + '\n' + msg;
@@ -328,7 +335,7 @@ module.exports = function ($) {
      * Basic error class factory to throw from within recipe.
      */
     function RecipeError(message, options) {
-        return $.gutil.PluginError.call(this, '_', $.gutil.colors.red(message), options);
+        return $.gutil.PluginError.call(this, '_', message, options);
     }
     RecipeError.prototype = Object.create($.gutil.PluginError.prototype);
 
@@ -346,7 +353,7 @@ module.exports = function ($) {
      * @constructor
      */
     function NamedRecipeError(name, message, options) {
-        return $.gutil.PluginError.call(this, name, $.gutil.colors.red(message), options);
+        return $.gutil.PluginError.call(this, name, message, options);
     }
 
     NamedRecipeError.prototype = Object.create($.gutil.PluginError.prototype);
@@ -384,7 +391,7 @@ module.exports = function ($) {
 
         _.each(proplist, function (prop) {
             if (_.isUndefined(byString(config, prop))) {
-                throw new RecipeError('Mandatory config field `' + prop + '` is missing.');
+                throw new RecipeError('Mandatory config field `' + $.gutil.colors.cyan(prop) + '` is missing.');
             }
         })
     }
