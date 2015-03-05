@@ -194,7 +194,10 @@ module.exports = function (gulp, options) {
                     // run config reader on given config
                     localConfig = recipeDef.configReader ? recipeDef.configReader(localLibs, _.clone(options)) : _.clone(options);
                     // prepare source pipes
-                    sources = localLibs.utils.makeSources(localConfig.sources);
+                    if(localConfig.sources) {
+                        sources = localLibs.utils.makeSources(localConfig.sources);
+                    }
+
                     return recipeDef.recipe(localLibs, localConfig, sources);
                 }
                 catch(e) {

@@ -90,6 +90,65 @@ module.exports = function ($) {
         return null;
     });
 
+    function _makeSource(source, defaultBase) {
+        var parsed = _parseSource(source);
+        if(_.isNull(parsed)) {
+            throw new Error;
+        }
+
+        return _.chain(parsed)
+            .map(function (obj) {
+                return _.defaults(obj, {read: true, base: defaultBase});
+            })
+            .groupBy(function (obj) {
+                return '' + obj.read + '' + obj.base;
+            })
+            .values()
+            .map(function (defs) {
+                var files = _.pluck(defs, 'files'),
+                    read = defs[0].read,
+                    base = defs[0].base,
+                    pipe = $.lazypipe().pipe($.gulp.src, files, {base: base, read: read});
+
+                pipe.globs = files;
+                pipe.bases = [base];
+                return pipe;
+            })
+            .thru(function (pipes) {
+                if (pipes.length > 1) {
+                    var singlePipe = mergedLazypipe(pipes);
+                    singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
+                    singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
+                    singlePipe.distinct = _.map(pipes, function (pipe) {
+                        return {globs: pipe.globs, base: pipe.bases[0]};
+                    });
+                    Object.freeze(singlePipe);
+                    return singlePipe;
+                }
+
+                if (pipes.length === 1) {
+                    var pipe = pipes[0];
+                    pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
+                    Object.freeze(pipe);
+                    return pipe;
+                }
+                else {
+                    var empty = $.lazypipe().pipe(function () {
+                        // instant end
+                        var stream = $.through2.obj();
+                        stream.push(null);
+                        return stream;
+                    });
+
+                    empty.distinct = [{globs: [], base: '.'}];
+                    empty.globs = [];
+                    Object.freeze(empty);
+                    return empty;
+                }
+            })
+            .value();
+    }
+
     // prepare lazypipes with source files, as defined in "sources" configuration
     /**
      * Transform source config into actual source pipes
@@ -97,66 +156,19 @@ module.exports = function ($) {
      * @returns {*} hash of source pipes (lazy loaded)
      */
     function makeSources(sourceDefs) {
+        var defaultBase = sourceDefs.defaultBase;
+
         return _.transform(sourceDefs, function (obj, source, key) {
             Object.defineProperty(obj, key, {
                 enumerable: true,
                 get: _.once(function () {
-                    var parsed = _parseSource(source);
-                    if(_.isNull(parsed)) {
+                    try {
+                        return _makeSource(source, defaultBase);
+                    }
+                    catch(e) {
+                        console.log(e);
                         throw new RecipeError('Configured source `' + $.gutil.colors.cyan(key) + '` is invalid.');
                     }
-
-                    return _.chain(parsed)
-                        .map(function (obj) {
-                            return _.defaults(obj, {read: true, base: sourceDefs.defaultBase});
-                        })
-                        .groupBy(function (obj) {
-                            return '' + obj.read + '' + obj.base;
-                        })
-                        .values()
-                        .map(function (defs) {
-                            var files = _.pluck(defs, 'files'),
-                                read = defs[0].read,
-                                base = defs[0].base,
-                                pipe = $.lazypipe().pipe($.gulp.src, files, {base: base, read: read});
-
-                            pipe.globs = files;
-                            pipe.bases = [base];
-                            return pipe;
-                        })
-                        .thru(function (pipes) {
-                            if (pipes.length > 1) {
-                                var singlePipe = mergedLazypipe(pipes);
-                                singlePipe.globs = _.flatten(_.pluck(pipes, 'globs'));
-                                singlePipe.bases = _.flatten(_.pluck(pipes, 'bases'));
-                                singlePipe.distinct = _.map(pipes, function (pipe) {
-                                    return {globs: pipe.globs, base: pipe.bases[0]};
-                                });
-                                Object.freeze(singlePipe);
-                                return singlePipe;
-                            }
-
-                            if (pipes.length === 1) {
-                                var pipe = pipes[0];
-                                pipe.distinct = [{globs: pipe.globs, base: pipe.bases[0]}];
-                                Object.freeze(pipe);
-                                return pipe;
-                            }
-                            else {
-                                var empty = $.lazypipe().pipe(function () {
-                                    // instant end
-                                    var stream = $.through2.obj();
-                                    stream.push(null);
-                                    return stream;
-                                });
-
-                                empty.distinct = [{globs: [], base: '.'}];
-                                empty.globs = [];
-                                Object.freeze(empty);
-                                return empty;
-                            }
-                        })
-                        .value();
                 })
             })
         }, {});
