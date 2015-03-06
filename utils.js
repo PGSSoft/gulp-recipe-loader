@@ -156,7 +156,7 @@ module.exports = function ($) {
      * @returns {*} hash of source pipes (lazy loaded)
      */
     function makeSources(sourceDefs) {
-        var defaultBase = sourceDefs.defaultBase;
+        var defaultBase = _.isUndefined(sourceDefs.defaultBase) ? '.' : sourceDefs.defaultBase;
 
         return _.transform(sourceDefs, function (obj, source, key) {
             Object.defineProperty(obj, key, {
