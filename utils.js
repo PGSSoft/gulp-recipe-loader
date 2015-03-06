@@ -10,6 +10,30 @@ module.exports = function ($) {
         }) : [];
     }
 
+    // merge arrays and keep unique
+    function _fillUnique(dest, source, key) {
+        var destVal = dest[key];
+        var srcVal = source[key];
+
+        if(_.isUndefined(srcVal)) {
+            return;
+        }
+
+        if(_.isArray(destVal) && _.isArray(srcVal)) {
+            dest[key] = _.uniq(_.union(srcVal, destVal), _.isEqual);
+        }
+        dest[key] = srcVal;
+    }
+
+    /**
+     * add source parameters to another lazypipe
+     * @param destPipe
+     * @param sourcePipe
+     */
+    function lazypipeAddSourceParams(destPipe, sourcePipe) {
+        _.each(['distinct', 'globs', 'bases'], _fillUnique.bind(null, destPipe, sourcePipe));
+    }
+
     /**
      * Retrive a list of published pipes with specified prefix from all loaded recipes
      * Note: Suitable for both sequential definitions and plain lazypipes, but type is not checked!
@@ -31,12 +55,16 @@ module.exports = function ($) {
      */
     function mergedLazypipe(lazypipes) {
         if (lazypipes && lazypipes.length > 0) {
-            return $.lazypipe()
+            var newPipe = $.lazypipe()
                 .pipe(function () {
                     return $.eventStream.merge.apply($.eventStream, _.map(lazypipes, function (pipe) {
                         return pipe();
                     }));
                 });
+
+            // accumulate collected sources into new pipe
+            _.each(lazypipes, lazypipeAddSourceParams.bind(null, newPipe));
+            return newPipe;
         }
 
         return $.lazypipe().pipe($.through2.obj);
@@ -172,19 +200,6 @@ module.exports = function ($) {
                 })
             })
         }, {});
-    }
-
-    // sort files in pipe
-    function sort(comp) {
-        var buff = [];
-        return $.through2.obj(function (file, enc, done) {
-            buff.push(file);
-            done(null);
-        }, function (done) {
-            buff.sort(comp).forEach(this.push.bind(this));
-            buff.length = 0;
-            done(null);
-        });
     }
 
     /**
@@ -396,6 +411,29 @@ module.exports = function ($) {
         })
     }
 
+    // sort files in pipe
+    function sort(comp) {
+        var buff = [];
+        return $.through2.obj(function (file, enc, done) {
+            buff.push(file);
+            done(null);
+        }, function (done) {
+            buff.sort(comp).forEach(this.push.bind(this));
+            buff.length = 0;
+            done(null);
+        });
+    }
+
+    /**
+     * pipe transformer for file sorting
+     * @returns {lazypipe}
+     */
+    function  sortFiles() {
+        return sort(function (a, b) {
+                return b.path === a.path ? 0 : b.path > a.path ? 1 : -1;
+            });
+    }
+
     return {
         getPipes: getPipes,
         mergedLazypipe: mergedLazypipe,
@@ -407,9 +445,7 @@ module.exports = function ($) {
         RecipeError: RecipeError,
         NamedRecipeError: NamedRecipeError,
         checkMandatory: checkMandatory,
-        sortFiles: $.lazypipe()
-            .pipe(sort, function (a, b) {
-                return b.path === a.path ? 0 : b.path > a.path ? 1 : -1;
-            })
+        sortFiles: sortFiles,
+        lazypipeAddSourceParams: lazypipeAddSourceParams
     }
 };

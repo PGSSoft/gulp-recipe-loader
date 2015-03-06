@@ -90,7 +90,7 @@ module.exports = function (gulp, options) {
     Object.defineProperty($, 'gulp', {value: gulp});
 
     // publish some internal packages to modules, if not published already
-    _.each(['lazypipe', 'event-stream', 'lodash', 'through2', 'gulp-watch'], function (internal) {
+    _.each(['event-stream', 'lodash', 'through2', 'gulp-watch'], function (internal) {
         var camelized = camelize(internal.replace('gulp-',''));
         if(!$.hasOwnProperty(camelized)) {
             Object.defineProperty($, camelized, {
@@ -101,10 +101,36 @@ module.exports = function (gulp, options) {
         }
     });
 
-
     // load utility functions
     $.gutil = gutil;
     $.utils = require('./utils')($);
+
+    // monkey patch lazypipe for passing sources props down the stream
+    var lazypipe = require('lazypipe');
+
+    function pipeFn(_pipe, ctor) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        var newPipe = _pipe.apply(this, args);
+
+        // recursively patch new object, as _pipe uses original createPipeline internally;
+        newPipe.pipe = pipeFn.bind(newPipe, newPipe.pipe);
+
+        // copy params from previous pipe
+        $.utils.lazypipeAddSourceParams(newPipe, this);
+
+        // when another stream passed as constructor, copy its params too
+        if(ctor.appendStepsTo) {
+            $.utils.lazypipeAddSourceParams(newPipe, ctor);
+        }
+
+        return newPipe;
+    }
+
+    $.lazypipe = function () {
+        var build = lazypipe();
+        build.pipe = pipeFn.bind(build, build.pipe);
+        return build;
+    };
 
     // resolve external recipe directories
     var externPattern = ['gulp-recipe-*', '!gulp-recipe-loader'];
