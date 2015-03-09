@@ -19,7 +19,6 @@
   "dependencies": {
     "event-stream": "^3.2.2",
     "findup-sync": "^0.2.1",
-    "glob": "^4.4.0",
     "globby": "^1.2.0",
     "gulp": "^3.8.11",
     "gulp-load-plugins": "^0.8.0",
@@ -28,7 +27,6 @@
     "lazypipe": "^0.2.2",
     "lodash": "^3.3.0",
     "parent-require": "^1.0.0",
-    "require-dir": "^0.1.0",
     "through2": "^0.6.3"
   }
 }
