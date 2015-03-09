@@ -67,7 +67,12 @@ module.exports = function ($) {
             return newPipe;
         }
 
-        return $.lazypipe().pipe($.through2.obj);
+        // no pipes to merge
+        return $.lazypipe().pipe(function () {
+            var stream = $.through2.obj();
+            stream.push(null); // end
+            return stream;
+        });
     }
 
     /**
@@ -76,6 +81,10 @@ module.exports = function ($) {
      * @returns {lazypipe} lazypipe representing a sequence of tasks
      */
     function sequentialLazypipe(lazypipeDefs) {
+        if(lazypipeDefs.length === 0) {
+            return $.lazypipe().pipe($.through2.obj);
+        }
+
         return _.chain(lazypipeDefs)
             .sortBy(0)
             .pluck(1)
@@ -225,7 +234,7 @@ module.exports = function ($) {
         }
 
         // load watch as external dep
-        var distincts = _.flatten(_.pluck(sources, 'distinct'));
+        var distincts = _.filter(_.flatten(_.pluck(sources, 'distinct')));
         return mergedLazypipe(_.map(distincts, function (opts) {
             return $.lazypipe()
                 .pipe($.watch, opts.globs, _.defaults({base: opts.base}, options), callback);
