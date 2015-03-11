@@ -15,11 +15,11 @@ module.exports = function ($) {
         var destVal = dest[key];
         var srcVal = source[key];
 
-        if(_.isUndefined(srcVal)) {
+        if (_.isUndefined(srcVal)) {
             return;
         }
 
-        if(_.isArray(destVal) && _.isArray(srcVal)) {
+        if (_.isArray(destVal) && _.isArray(srcVal)) {
             dest[key] = _.uniq(_.union(srcVal, destVal), _.isEqual);
         }
         dest[key] = srcVal;
@@ -81,7 +81,7 @@ module.exports = function ($) {
      * @returns {lazypipe} lazypipe representing a sequence of tasks
      */
     function sequentialLazypipe(lazypipeDefs) {
-        if(lazypipeDefs.length === 0) {
+        if (lazypipeDefs.length === 0) {
             return $.lazypipe().pipe($.through2.obj);
         }
 
@@ -129,7 +129,7 @@ module.exports = function ($) {
 
     function _makeSource(source, defaultBase) {
         var parsed = _parseSource(source);
-        if(_.isNull(parsed)) {
+        if (_.isNull(parsed)) {
             throw new Error;
         }
 
@@ -202,7 +202,7 @@ module.exports = function ($) {
                     try {
                         return _makeSource(source, defaultBase);
                     }
-                    catch(e) {
+                    catch (e) {
                         console.log(e);
                         throw new RecipeError('Configured source `' + $.gutil.colors.cyan(key) + '` is invalid.');
                     }
@@ -361,6 +361,7 @@ module.exports = function ($) {
     function RecipeError(message, options) {
         return $.gutil.PluginError.call(this, '_', message, options);
     }
+
     RecipeError.prototype = Object.create($.gutil.PluginError.prototype);
 
     RecipeError.prototype.toString = function () {
@@ -437,10 +438,10 @@ module.exports = function ($) {
      * pipe transformer for file sorting
      * @returns {lazypipe}
      */
-    function  sortFiles() {
+    function sortFiles() {
         return sort(function (a, b) {
-                return b.path === a.path ? 0 : b.path > a.path ? 1 : -1;
-            });
+            return b.path === a.path ? 0 : b.path > a.path ? 1 : -1;
+        });
     }
 
     return {
