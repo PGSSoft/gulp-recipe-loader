@@ -7,6 +7,7 @@ var _ = require('lodash');
 var path = require('path');
 var globby = require('globby');
 var gutil = require('gulp-util');
+var libSource = require('./lib/source')
 
 // workaround for linked development modules
 var prequire = require('parent-require');
@@ -105,32 +106,7 @@ module.exports = function (gulp, options) {
     $.gutil = gutil;
     $.utils = require('./utils')($);
 
-    // monkey patch lazypipe for passing sources props down the stream
-    var lazypipe = require('lazypipe');
-
-    function pipeFn(_pipe, ctor) {
-        var args = Array.prototype.slice.call(arguments, 1);
-        var newPipe = _pipe.apply(this, args);
-
-        // recursively patch new object, as _pipe uses original createPipeline internally;
-        newPipe.pipe = pipeFn.bind(newPipe, newPipe.pipe);
-
-        // copy params from previous pipe
-        $.utils.lazypipeAddSourceParams(newPipe, this);
-
-        // when another stream passed as constructor, copy its params too
-        if(ctor.appendStepsTo) {
-            $.utils.lazypipeAddSourceParams(newPipe, ctor);
-        }
-
-        return newPipe;
-    }
-
-    $.lazypipe = function () {
-        var build = lazypipe();
-        build.pipe = pipeFn.bind(build, build.pipe);
-        return build;
-    };
+    $.lazypipe = require('./lib/lazypipe').lazypipe;
 
     // resolve external recipe directories
     var externPattern = ['gulp-recipe-*', '!gulp-recipe-loader'];
