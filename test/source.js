@@ -10,9 +10,9 @@ var expect = chai.expect;
 
 var source = require('./../lib/source');
 
-describe('recipe loader source module', function () {
-    describe('parsing', function () {
-        it('should parse single string', function () {
+describe('recipe loader source module', () => {
+    describe('parsing', () => {
+        it('should parse single string', () => {
 
             var parseIn = 'app/*.js';
             var parseOut = [{
@@ -22,7 +22,7 @@ describe('recipe loader source module', function () {
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
 
-        it('should parse array of strings', function () {
+        it('should parse array of strings', () => {
 
             var parseIn = ['app/*.js', 'app/*.css'];
             var parseOut = [{
@@ -34,7 +34,7 @@ describe('recipe loader source module', function () {
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
 
-        it('should parse object with files as string', function () {
+        it('should parse object with files as string', () => {
             var parseIn = {
                 files: 'app/*.js'
             };
@@ -46,7 +46,7 @@ describe('recipe loader source module', function () {
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
 
-        it('should parse array of objects with files as string', function () {
+        it('should parse array of objects with files as string', () => {
             var parseIn = [{
                 files: 'app/*.js'
             }, {
@@ -62,7 +62,7 @@ describe('recipe loader source module', function () {
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
 
-        it('should parse array of object with files as array of strings', function () {
+        it('should parse array of object with files as array of strings', () => {
             var parseIn = [{
                 files: ['app/*.js', 'app/*.css']
             }, {
@@ -82,7 +82,7 @@ describe('recipe loader source module', function () {
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
 
-        it('should parse array of mixed strings and objects', function () {
+        it('should parse array of mixed strings and objects', () => {
             var parseIn = [
                 'app/*.js',
                 'app/*.css',
@@ -107,14 +107,26 @@ describe('recipe loader source module', function () {
 
             expect(source.parse(parseIn)).to.eql(parseOut);
         });
+
+        it('should throw error for invalid input', () => {
+            var fn1 = () => source.parse({});
+            var fn2 = () => source.parse([{}]);
+            var fn3 = () => source.parse({files: [{}]});
+            var fn4 = () => source.parse({files: {}});
+
+            expect(fn1).to.throw(Error, 'invalid source');
+            expect(fn2).to.throw(Error, 'invalid source');
+            expect(fn3).to.throw(Error, 'invalid source');
+            expect(fn4).to.throw(Error, 'invalid source');
+        });
     });
 
-    describe('creating', function () {
+    describe('creating', () => {
         var defaultBase = 'app/';
-        var noop = function () {
+        var noop = () => {
         };
 
-        it('should make pipe from simple files definition', function () {
+        it('should make pipe from simple files definition', () => {
             var makeIn = [{
                 files: 'app/*.js'
             }];
@@ -134,7 +146,7 @@ describe('recipe loader source module', function () {
             expect(made.distinct).to.eql(distinct);
         });
 
-        it('should make pipe from complex files definition', function () {
+        it('should make pipe from complex files definition', () => {
             var makeIn = [{
                 files: 'app/*.js'
             }, {
@@ -174,13 +186,68 @@ describe('recipe loader source module', function () {
             expect(made.bases).to.be.eql(bases);
             expect(made.distinct).to.be.eql(distinct);
         });
+
+        it('should throw on invalid input', () => {
+            var fn1 = () => source.make({}, noop, defaultBase);
+            expect(fn1).to.throw(Error, 'invalid source');
+        });
+
+        it('should recognize distinct sources with different watch', () => {
+            var makeIn = [{
+                files: 'app/*.js',
+                watch: true
+            }, {
+                files: 'app/*.scss',
+                watch: false
+            }, 'app/*.css'];
+
+            var distinct = [{
+                base: 'app/',
+                globs: ['app/*.js', 'app/*.css'],
+                read: true,
+                watch: true
+            }, {
+                base: 'app/',
+                globs: ['app/*.scss'],
+                read: true,
+                watch: false
+            }];
+
+            var made = source.make(makeIn, noop, defaultBase);
+
+            expect(made.distinct).to.be.eql(distinct);
+        });
+
+        it('should emit ended pipe for empty input', () => {
+            var makeIn = [];
+
+            var made = source.make(makeIn, noop, defaultBase);
+
+            expect(made.distinct).to.be.eql([]);
+            expect(made.globs).to.be.eql([]);
+            expect(made.bases).to.be.eql([]);
+            expect(made.watch).to.be.equal(false);
+
+            var p = new Promise(function (resolve, reject) {
+                var pipe = made();
+                pipe.on('data', reject);
+                pipe.on('end', resolve);
+            });
+
+            return expect(p).to.eventually.be.resovled;
+        });
+
     });
 
-    describe('using pipes', function () {
+    describe('using pipes', () => {
         var defaultBase = 'app/';
 
-        it('should call pipe constructor on initialization', function () {
-            var ctor = sinon.stub().returns({pipe: function () {}, on: function () {}});
+        it('should call pipe constructor on initialization', () => {
+            var ctor = sinon.stub().returns({
+                pipe: () => {
+                }, on: () => {
+                }
+            });
 
             var makeIn = [{
                 files: 'app/*.js'
