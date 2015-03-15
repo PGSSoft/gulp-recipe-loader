@@ -7,7 +7,6 @@ var _ = require('lodash');
 var path = require('path');
 var globby = require('globby');
 var gutil = require('gulp-util');
-var libSource = require('./lib/source')
 
 // workaround for linked development modules
 var prequire = require('parent-require');
@@ -160,7 +159,14 @@ module.exports = function (gulp, options) {
                 requireFn: function (name) {
                     // resolve inner dependency path
                     var depPath = path.join(dir, 'node_modules', name);
-                    return requireFn(depPath);
+                    try {
+                        // direct module require may fail, if dedupe was done
+                        return requireFn(depPath);
+                    }
+                    catch(e) {
+                        // for that occasions a regular require is sufficient
+                        return requireFn(name);
+                    }
                 }
             }, extPluginsConfig);
 
