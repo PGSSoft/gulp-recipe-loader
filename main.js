@@ -15,7 +15,13 @@ var requireFn = function (module) {
         return require(module);
     }
     catch(e) {
-        return prequire(module);
+        if(e.code === 'MODULE_NOT_FOUND') {
+            try {
+                return prequire(module);
+            }
+            catch(e2) {} // throw original error
+        }
+        throw e;
     }
 };
 
@@ -164,8 +170,14 @@ module.exports = function (gulp, options) {
                         return requireFn(depPath);
                     }
                     catch(e) {
-                        // for that occasions a regular require is sufficient
-                        return requireFn(name);
+                        if(e.code === 'MODULE_NOT_FOUND') {
+                            // for that occasions a regular require is sufficient
+                            try {
+                                return requireFn(name);
+                            }
+                            catch(e2) {} // throw original error
+                        }
+                        throw e;
                     }
                 }
             }, extPluginsConfig);
@@ -178,7 +190,7 @@ module.exports = function (gulp, options) {
                     get: function () {
                         return localPlugins[prop];
                     }
-                })
+                });
             });
         }
 
