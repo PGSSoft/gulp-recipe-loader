@@ -215,6 +215,9 @@ module.exports = function (gulp, options) {
                     localConfig = recipeDef.configReader ? recipeDef.configReader(localLibs, _.cloneDeep(options)) : _.cloneDeep(options);
                     // prepare source pipes
                     if(localConfig.sources) {
+                        if(_.isUndefined(localConfig.sources.defaultBase) && options.sources) {
+                            localConfig.sources.defaultBase = options.sources.defaultBase;
+                        }
                         sources = localLibs.utils.makeSources(localConfig.sources);
                     }
 
