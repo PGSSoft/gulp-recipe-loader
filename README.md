@@ -43,9 +43,9 @@ sources.bowerScripts = [
 
 If you need to change the base for specific set of paths, you can use object notation.
 ``` javascript
-sources.tempFiles = {
-    files: 'tmp/**/*', // the 'files' can be any valid source. A glob or array of globs will work.
-    base: 'tmp/'
+sources.specialFiles = {
+    files: 'special/**/*', // the 'files' can be any valid source. A glob or array of globs will work.
+    base: 'special/'
 };
 ```
 
