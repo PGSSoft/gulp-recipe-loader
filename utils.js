@@ -287,6 +287,7 @@ module.exports = function ($) {
     return {
         getPipes: getPipes,
         mergedLazypipe: ops.mergedLazypipe,
+        parseSources: libSource.parse,
         sequentialLazypipe: ops.sequentialLazypipe,
         queuedLazypipe: ops.queuedLazypipe,
         watchSource: watchSource,
