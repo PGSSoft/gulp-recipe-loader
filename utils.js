@@ -23,6 +23,9 @@ module.exports = function ($) {
     function getPipes(prefix) {
         return _.reduce(Object.getOwnPropertyNames($.recipes), function (mem, moduleName) {
             var m = $.recipes[moduleName];
+            if(!_.isPlainObject(m)) {
+                throw new NamedRecipeError(moduleName, 'Recipe function should return an object.');
+            }
             var pipes = _getPipesFrom(m.pipes, prefix);
             return pipes ? mem.concat(pipes) : mem;
         }, []);
