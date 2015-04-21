@@ -287,6 +287,18 @@ module.exports = function ($) {
         });
     }
 
+    /**
+     * Collect all hooks with given name from tasks
+     * @returns [string]
+     */
+    function getHooks(name, recipes) {
+        return _.chain(recipes)
+            .pluck(name)
+            .filter()
+            .flatten()
+            .value();
+    }
+
     return {
         getPipes: getPipes,
         mergedLazypipe: ops.mergedLazypipe,
@@ -300,6 +312,7 @@ module.exports = function ($) {
         NamedRecipeError: NamedRecipeError,
         checkMandatory: checkMandatory,
         sortFiles: sortFiles,
-        makeSources: makeSources
+        makeSources: makeSources,
+        getHooks: getHooks
     };
 };
