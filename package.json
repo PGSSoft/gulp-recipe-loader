@@ -1,6 +1,6 @@
 {
   "name": "gulp-recipe-loader",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Gulp environment with receipe modules autoloading with hooks",
   "main": "main.js",
   "repository": {
