@@ -8,6 +8,8 @@ var errors = require('./lib/errors');
 module.exports = function ($) {
     var _ = $.lodash;
 
+    var runSequence = require('run-sequence').use($.gulp);
+
     // get pipes with given prefix from specific list
     function _getPipesFrom(pipes, prefix) {
         return pipes ? _.reject(pipes, function (val, key) {
@@ -87,42 +89,6 @@ module.exports = function ($) {
         }));
     }
 
-    // orchestrator events cannot be unbound,
-    // so bind it only once and resolve handlers in loop
-
-    // register event only once
-    var _getEventProcessor = _.memoize(function (event) {
-        var handlers = [];
-        $.gulp.on(event, function () {
-            var self = this;
-            var args = arguments;
-
-            _.each(handlers, function (handler) {
-                handler.apply(self, args);
-            });
-        });
-        return {
-            add: function (cb) {
-                handlers.push(cb);
-            },
-            remove: function (cb) {
-                var index = handlers.indexOf(cb);
-                if (index >= 0) {
-                    handlers.splice(index, 1);
-                }
-            }
-        };
-    });
-
-    function on(event, cb) {
-        // initialize and get event processor
-        var handlers = _getEventProcessor(event);
-        // add handler
-        handlers.add(cb);
-        // return function to unbind event
-        return handlers.remove.bind(handlers, cb);
-    }
-
     /**
      * Run gulp tasks and provide end callback
      * @param tasks Array of single task name to be started
@@ -133,25 +99,16 @@ module.exports = function ($) {
             tasks = [tasks];
         }
 
-        // exit when
-        if (tasks.length === 0) {
-            if (_.isFunction(cb)) {
-                cb();
-            }
-            return;
+        if (!_.isFunction(cb)) {
+            cb = _.noop;
         }
 
-        var running = tasks.length;
-        var off = on('task_stop', function (e) {
-            if (tasks.indexOf(e.task) >= 0 && --running === 0) {
-                off();
-                if (_.isFunction(cb)) {
-                    cb();
-                }
-            }
-        });
-
-        $.gulp.start(tasks);
+        // exit when
+        if (tasks.length === 0) {
+            cb();
+            return;
+        }
+        runSequence(tasks, cb);
     }
 
     /**
