@@ -61,7 +61,6 @@ module.exports = function ($) {
 
     /**
      * Watch source files and do action when any file is added, modified, renamed or deleted
-     * Note: needs gulp-watch installed as main project dependency
      * @param sources Source or array of sources to watch
      * @param options options for gulp-watch
      * @param callback Callback to gulp-sass, called when fs event occurs
