@@ -81,6 +81,14 @@ module.exports = function ($) {
             sources = [sources];
         }
 
+        // handle array of tasks as callback
+        if(_.isArray(callback)) {
+            var tasks = callback;
+            callback = function () {
+                runSubtasks(tasks);
+            };
+        }
+
         // load watch as external dep
         var distincts = _.filter(_.flatten(_.pluck(sources, 'distinct')), {watch: true});
         return ops.mergedLazypipe(_.map(distincts, function (opts) {
