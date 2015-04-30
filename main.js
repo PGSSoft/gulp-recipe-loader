@@ -142,7 +142,12 @@ module.exports = function (gulp, options) {
 
     // load all recipes from local project directory
     var localRecipes = _.object(_.map(globby.sync(options.recipesPattern), function (module) {
-        return [path.basename(module, '.js'), require(path.join(parentDir, module))];
+        var recipeName = path.basename(module, '.js');
+        if(recipeName === 'main') {
+          recipeName = path.basename(path.dirname(module));
+        }
+
+        return [recipeName, require(path.join(parentDir, module))];
     }));
 
     // create a way to extend lib getter object with modules local libs, prefer local versions
