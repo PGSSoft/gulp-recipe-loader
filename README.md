@@ -97,5 +97,5 @@ sources.moreFiles = [
 
 [npm-url]: https://npmjs.org/package/gulp-recipe-loader
 [npm-image]: https://nodei.co/npm/gulp-recipe-loader.png?downloads=true
-[depstat-url]: https://david-dm.org/PGS-dev/gulp-recipe-loader
-[depstat-image]: https://img.shields.io/david/PGS-dev/gulp-recipe-loader.svg?style=flat
+[depstat-url]: https://david-dm.org/PGSSoft/gulp-recipe-loader
+[depstat-image]: https://img.shields.io/david/PGSSoft/gulp-recipe-loader.svg?style=flat
