@@ -7,6 +7,7 @@ var _ = require('lodash');
 var path = require('path');
 var globby = require('globby');
 var gutil = require('gulp-util');
+var fs = require('fs');
 
 // workaround for linked development modules
 var prequire = require('parent-require');
@@ -55,6 +56,30 @@ function camelize(str) {
     });
 }
 
+/**
+ * Checks if at least one of devDependency directory exists
+ * (to distinguish production and dev npm install)
+ *
+ * @param dependency
+ * @returns {*}
+ */
+function devDependenciesExists(dependency) {
+    var depExists;
+
+    if (!dependency) {
+        return false;
+    }
+
+    try {
+        depExists = fs.statSync(path.join('node_modules', dependency)).isDirectory();
+    }
+    catch(e) {
+        depExists = false;
+    }
+
+    return depExists;
+}
+
 // require gulp from outside world to prevent multiple instances. This could also be a peer dependency,
 // but it gets tricky with multiple layers of modules
 module.exports = function (gulp, options) {
@@ -80,10 +105,13 @@ module.exports = function (gulp, options) {
         packageFile = require(packageFile);
     }
 
+    // check for devDependencies
+    var loadDevDependencies = devDependenciesExists(_.findKey(_.result(packageFile,'devDependencies')));
+
     // lazy load all non-recipe plugins from package.json
     var $ = loadPlugins({
         pattern: ['*', '!gulp-recipe-*', '!gulp'],
-        scope: ['dependencies', 'devDependencies'],
+        scope: loadDevDependencies ? ['dependencies', 'devDependencies'] : ['dependencies'],
         replaceString: 'gulp-',
         camelize: true,
         lazy: true,
@@ -115,7 +143,7 @@ module.exports = function (gulp, options) {
 
     // resolve external recipe directories
     var externPattern = ['gulp-recipe-*', '!gulp-recipe-loader'];
-    var externScope = ['dependencies', 'devDependencies'];
+    var externScope = loadDevDependencies ? ['dependencies', 'devDependencies'] : ['dependencies'];
     var replaceString = 'gulp-recipe-';
     var pluginNames = _.reduce(externScope, function(result, prop) {
         return result.concat(Object.keys(packageFile[prop] || {}));
