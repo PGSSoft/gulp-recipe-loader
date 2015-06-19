@@ -40,7 +40,7 @@ module.exports = function ($) {
      * @param sourceDefs sources configuration
      * @returns {*} hash of source pipes (lazy loaded)
      */
-    function makeSources(sourceDefs) {
+    function makeSources(sourceDefs, sourceProcessor) {
         var defaultBase = _.isUndefined(sourceDefs.defaultBase) ? '.' : sourceDefs.defaultBase;
 
         return _.transform(sourceDefs, function (obj, source, key) {
@@ -48,7 +48,11 @@ module.exports = function ($) {
                 enumerable: true,
                 get: _.once(function () {
                     try {
-                        return libSource.make(source, $.gulp.src, defaultBase);
+                        var stream = libSource.make(source, $.gulp.src, defaultBase);
+                        if(_.isFunction(sourceProcessor)) {
+                            return stream.pipe(sourceProcessor);
+                        }
+                        return stream;
                     }
                     catch (e) {
                         console.log(e.stack);

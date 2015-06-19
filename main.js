@@ -87,6 +87,8 @@ module.exports = function (gulp, options) {
         options = {};
     }
 
+    var allRecipesInitalized = false;
+
     // set default options
     options = _.merge({
         tasks: {},
@@ -230,6 +232,18 @@ module.exports = function (gulp, options) {
         return localLibs;
     };
 
+    var processSourceHook = _.once(function () {
+        // This hook function is evaluated on first source pipe usage,
+        // which means inside a specific task, after all recipes are successfuly loaded.
+        // It's safe to grab pipe hooks from there, unles a specific plugin
+        // decides to evaluate pipe before initialization. Yell at it!
+        if(!allRecipesInitalized) {
+            throw new $.utils.RecipeError('Stream created before all recipes are initialized.');
+        }
+
+        return $.utils.sequentialLazypipe($.utils.getPipes('processSource'));
+    });
+
     // prepare lazy initializers for recipes, so it may be cross referenced
     $.recipes = {};
     _.each(_.merge(recipes, localRecipes), function (recipeDef, key) {
@@ -251,7 +265,9 @@ module.exports = function (gulp, options) {
                         if(_.isUndefined(localConfig.sources.defaultBase) && options.sources) {
                             localConfig.sources.defaultBase = options.sources.defaultBase;
                         }
-                        sources = localLibs.utils.makeSources(localConfig.sources);
+                        sources = localLibs.utils.makeSources(localConfig.sources, function () {
+                            return processSourceHook()();
+                        });
                     }
 
                     return recipeDef.recipe(localLibs, localConfig, sources);
@@ -280,6 +296,8 @@ module.exports = function (gulp, options) {
             process.exit(1);
         }
     });
+
+    allRecipesInitalized = true;
 
     return $;
 };
