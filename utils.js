@@ -63,6 +63,10 @@ module.exports = function ($) {
         }, {});
     }
 
+    var processSourceHook = _.once(function () {
+        return $.utils.sequentialLazypipe($.utils.getPipes('processSource'));
+    });
+
     /**
      * Watch source files and do action when any file is added, modified, renamed or deleted
      * @param sources Source or array of sources to watch
@@ -96,7 +100,8 @@ module.exports = function ($) {
         var distincts = _.filter(_.flatten(_.pluck(sources, 'distinct')), {watch: true});
         return ops.mergedLazypipe(_.map(distincts, function (opts) {
             return lazypipe()
-                .pipe($.watch, opts.globs, _.defaults({base: opts.base}, options), callback);
+                .pipe($.watch, opts.globs, _.defaults({base: opts.base}, options), callback)
+                .pipe(processSourceHook());
         }));
     }
 
