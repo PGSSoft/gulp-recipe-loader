@@ -2,7 +2,7 @@
 
 var findup = require('findup-sync');
 var loadPlugins = require('gulp-load-plugins');
-var multimatch = require('gulp-load-plugins/node_modules/multimatch');
+var multimatch = require('multimatch');
 var _ = require('lodash');
 var path = require('path');
 var globby = require('globby');

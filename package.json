@@ -25,6 +25,7 @@
     "gulp-watch": "^4.1.1",
     "lazypipe": "^0.2.2",
     "lodash": "^3.3.0",
+    "multimatch": "^2.0.0",
     "parent-require": "^1.0.0",
     "run-sequence": "^1.1.0",
     "streamqueue": "^1.1.0",
